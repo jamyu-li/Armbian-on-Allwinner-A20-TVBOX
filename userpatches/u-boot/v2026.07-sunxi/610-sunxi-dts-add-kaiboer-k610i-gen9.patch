@@ -1,0 +1,321 @@
+--- a/arch/arm/dts/Makefile
++++ b/arch/arm/dts/Makefile
+@@ -539,6 +539,7 @@
+ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-ainol-aw1.dtb \
+ 	sun7i-a20-bananapi.dtb \
++	sun7i-a20-kaiboer-k610i-gen9.dtb \
+ 	sun7i-a20-bananapi-m1-plus.dtb \
+ 	sun7i-a20-bananapro.dtb \
+ 	sun7i-a20-cubieboard2.dtb \
+--- /dev/null
++++ b/arch/arm/dts/sun7i-a20-kaiboer-k610i-gen9.dts
+@@ -0,0 +1,245@@
++// SPDX-License-Identifier: GPL-2.0+ OR MIT
++/*
++ * Kaiboer K610i 9th Gen TV Box (Allwinner A20/sun7i)
++ * Based on vendor sys_config.fex: MMC0 PF0-5/CD PD4, UART0 PB22/23,
++ * USB1 vbus PH6, USB2 vbus PH3, OTG id PH4/drv_vbus PB9, AXP209 @0x34.
++ */
++/dts-v1/;
++#include "sun7i-a20.dtsi"
++#include "sunxi-common-regulators.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++
++/ {
++	model = "Kaiboer K610i 9th Gen TV Box";
++	compatible = "kaiboer,k610i-gen9", "allwinner,sun7i-a20";
++
++	aliases {
++		serial0 = &uart0;
++		mmc0 = &mmc0;
++//		ethernet0 = &gmac;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++// 		bootargs = "console=ttyS0,115200 console=tty0 root=/dev/mmcblk0p2 rootwait rw";
++	};
++
++//	/* SD slot fixed 3.3V; FEX sdc_regulator=none */
++//	reg_vcc3v3_mmc0: vcc3v3-mmc0 {
++//		compatible = "regulator-fixed";
++//		regulator-name = "vcc3v3-mmc0";
++//		regulator-min-microvolt = <3300000>;
++//		regulator-max-microvolt = <3300000>;
++//		regulator-always-on;
++//	};
++//
++
++	hdmi-out {
++		compatible = "hdmi-connector";
++		type = "a";
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++};
++
++&pio {
++	usb_5v_en: usb-5v-en {
++		gpio-hog;
++		gpios = <3 2 GPIO_ACTIVE_HIGH>;	/* PD2 */
++		output-high;
++		line-name = "usb-5v-en";
++	};
++};
++
++	/* OTG vbus drive via PB09 (FEX usb_drv_vbus_gpio=PB09) */
++&reg_usb0_vbus {
++    gpio = <&pio 1 9 GPIO_ACTIVE_HIGH>; /* PB09 */
++    enable-active-high;
++    regulator-always-on;
++    status = "okay";
++};
++	/* USB1 host vbus PH06 (FEX usbc1 drv_vbus) */
++&reg_usb1_vbus {
++    gpio = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH06 */
++    enable-active-high;
++    regulator-always-on;
++    status = "okay";
++};
++	/* USB2 host vbus PH03 (FEX usbc2 drv_vbus) */
++&reg_usb2_vbus {
++    gpio = <&pio 7 3 GPIO_ACTIVE_HIGH>; /* PH03 */
++    enable-active-high;
++    regulator-always-on;
++    status = "okay";
++};
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pb_pins>;
++	status = "okay";
++};
++
++&i2c0 {
++//	pinctrl-names = "default";
++//	pinctrl-0 = <&i2c0_pins>;
++	status = "okay";
++
++	axp209: pmic@34 {
++		compatible = "x-powers,axp209";
++		reg = <0x34>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++//		interrupt-controller;
++		#interrupt-cells = <1>;
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	/*
++	 * FEX mmc0: sdc_det=PD4, sdc_detmode=1, active low.
++	 * If U-Boot keeps printing "MMC: no card present" on a soldered slot,
++	 * comment cd-gpios and use:
++	 *   non-removable;
++	 *   max-frequency = <25000000>;
++	 */
++	cd-gpios = <&pio 3 4 GPIO_ACTIVE_LOW>; /* PD04 */
++	max-frequency = <50000000>;
++	status = "okay";
++};
++
++/* 百兆 EMAC，引用 dtsi 里已有的 emac_pa_pins */
++&gmac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gmac_mii_pins>;
++	phy-handle = <&phy1>;
++	phy-mode = "mii";
++//	allwinner,sram = <&emac_sram 1>;
++//	reset-gpios = <&pio 0 17 GPIO_ACTIVE_LOW>; /* PA17 复位，低电平有效 */
++	status = "okay";
++};
++
++&gmac_mdio {
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	phy1: ethernet-phy@1 {
++		reg = <1>;
++	};
++};
++
++// &gmac {
++//	status = "disabled";
++// };
++
++&ehci0 { 
++	status = "okay"; 
++	vbus-supply = <&reg_usb1_vbus>;
++};
++
++&ehci1 { 
++	status = "okay"; 
++	vbus-supply = <&reg_usb2_vbus>;
++};
++
++&ohci0 { 
++	status = "okay";
++	vbus-supply = <&reg_usb1_vbus>;
++};
++
++&ohci1 { 
++	status = "okay"; 
++	vbus-supply = <&reg_usb2_vbus>;
++};
++
++&otg_sram { 
++	status = "okay"; 
++};
++
++&usb_otg {
++	dr_mode = "host";
++	status = "okay";
++	vbus-supply = <&reg_usb0_vbus>;
++};
++
++&usbphy {
++	status = "okay";
++	usb0_vbus-supply = <&reg_usb0_vbus>;
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++};
++
++&hdmi {
++	status = "okay";
++};
++
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
++&de { 
++	status = "okay"; 
++};
++
++&tcon0 { 
++	status = "okay"; 
++};
++
++#include "axp209.dtsi"
++
++&ac_power_supply {
++	status = "okay";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1450000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-always-on;
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc-pll";
++};
++
++&reg_ldo3 {
++//	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pll-3v3";
++};
++
++&reg_ldo4 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pg";
++};
+--- /dev/null
++++ b/configs/kaiboer_k610i_gen9_defconfig
+@@ -0,0 +1,60 @@
++CONFIG_ARM=y
++CONFIG_ARCH_SUNXI=y
++CONFIG_MACH_SUN7I=y
++CONFIG_DEFAULT_DEVICE_TREE="sun7i-a20-kaiboer-k610i-gen9"
++CONFIG_SPL=y
++CONFIG_DRAM_CLK=432
++CONFIG_DRAM_ZQ=123
++CONFIG_DRAM_ODT_EN=n
++CONFIG_DRAM_TPR0=0x38d48893
++CONFIG_DRAM_TPR1=0xa0a0
++CONFIG_DRAM_TPR2=0x22a00
++CONFIG_DRAM_EMR1=0x4
++CONFIG_DRAM_EMR2=0x10
++CONFIG_DRAM_EMR3=0x0
++CONFIG_NR_DRAM_BANKS=1
++CONFIG_SPL_MMC_SUPPORT=y
++CONFIG_SYS_CLK_FREQ=912000000
++CONFIG_MMC_SUNXI=y
++CONFIG_MMC_SUNXI_SLOT_EXTRA=3
++CONFIG_MMC0_CD_PIN="PD4"
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_KEYBOARD=y
++CONFIG_AXP209_POWER=y
++CONFIG_AXP_DCDC2_VOLT=1400
++CONFIG_AXP_DCDC3_VOLT=1250
++CONFIG_AXP_DLDO2_VOLT=3000
++CONFIG_AXP_DLDO3_VOLT=3300
++CONFIG_AXP_DLDO4_VOLT=3300
++CONFIG_CONS_INDEX=1
++CONFIG_BAUDRATE=115200
++CONFIG_SYS_CONFIG_NAME="kaiboer_k610i_gen9"
++CONFIG_USE_ARCH_MEMCPY=y
++CONFIG_USE_ARCH_MEMSET=y
++CONFIG_SPL_SPI_SUNXI=y
++CONFIG_VIDEO=y
++CONFIG_VIDEO_HDMI=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_OF_LIST="sun7i-a20-kaiboer-k610i-gen9"
++CONFIG_SPL_DOS_PARTITION=y
++CONFIG_SPL_LIBDISK_SUPPORT=y
++CONFIG_SPL_SERIAL=y
++CONFIG_SPL_I2C=y
++CONFIG_SPL_POWER=y
++CONFIG_SPL_SYS_I2C_LEGACY=y
++CONFIG_SYS_I2C_MVTWSI=y
++CONFIG_SYS_I2C_SPEED=400000
++CONFIG_SYS_I2C_SLAVE=0x7f
++CONFIG_CMD_MMC=y
++CONFIG_DM_I2C=y
++CONFIG_OF_LIBFDT=y
++CONFIG_SUPPORT_PASSING_ATAGS=y
++CONFIG_PHYLIB=y
++CONFIG_MII=y
++CONFIG_DM_ETH=y
++CONFIG_PHY=y
++CONFIG_SUN7I_GMAC=y
++CONFIG_ETH_DESIGNWARE=y
++CONFIG_PHY_REALTEK=y

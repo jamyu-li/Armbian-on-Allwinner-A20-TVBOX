@@ -1,0 +1,371 @@
+--- /dev/null	2026-09-28 19:08:19.316999027 +0800
++++ b/arch/arm/boot/dts/allwinner/sun7i-a20-kaiboer-k610i-gen9.dts	2026-09-29 00:32:20.638831589 +0800
+@@ -0,0 +1,368 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Device Tree Source for the Kaiboer K610i 9th Generation TV Box
++ * SoC: Allwinner A20 (sun7i)
++ */
++
++/dts-v1/;
++#include "sun7i-a20.dtsi"
++#include "sunxi-common-regulators.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++
++/ {
++	model = "Kaiboer K610i 9th Gen TV Box";
++	compatible = "kaiboer,k610i-gen9", "allwinner,sun7i-a20";
++
++	aliases {
++		serial0 = &uart0;
++		mmc0 = &mmc0;
++//		ethernet0 = &gmac;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++//		bootargs = "console=ttyS0,115200 console=tty0 root=/dev/mmcblk0p2 rootwait rw";
++	};
++
++	hdmi-connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++//		pinctrl-names = "default";
++//		pinctrl-0 = <&led_pins_k610i>;
++
++		led-0 {
++			label = "k610i:blue:power";
++			gpios = <&pio 3 17 GPIO_ACTIVE_HIGH>; /* PD17 */
++//			default-state = "on";
++    			linux,default-trigger = "mmc0"; /* SD读写显示 */
++		};
++	};
++
++	gpio_keys: gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&key_pins_k610i>;
++
++		recovery {
++			label = "recovery";
++			linux,code = <0x198>; /* KEY_RESTART */
++			gpios = <&pio 7 16 GPIO_ACTIVE_LOW>; /* PH16 */
++		};
++	};
++};
++
++/* ---- 覆盖 common-regulators 里的 usb0_vbus：FEX 用 PH9 而非默认 PB9 ---- */
++&reg_usb0_vbus {
++	gpio = <&pio 1 9 GPIO_ACTIVE_HIGH>; /* PB09 */
++	status = "okay";
++};
++
++&reg_usb1_vbus {
++    gpio = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH06 */
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++    gpio = <&pio 7 3 GPIO_ACTIVE_HIGH>; /* PH03 */
++	status = "okay";
++};
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&cpu1 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++/* 百兆 EMAC，引用 dtsi 里已有的 emac_pa_pins */
++&gmac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gmac_mii_pins>;
++	phy-handle = <&phy1>;
++	phy-mode = "mii";
++//	allwinner,sram = <&emac_sram 1>;
++	status = "okay";
++
++};
++
++&gmac_mdio {
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	phy1: ethernet-phy@1 {
++		reg = <1>;
++//		reset-gpios = <&pio 0 17 GPIO_ACTIVE_LOW>; /* PA17 */
++//		reset-assert-us = <10000>;
++//		reset-deassert-us = <10000>;
++	};
++};
++
++// &gmac {
++//	status = "disabled";
++// };
++
++&i2c0 {
++	status = "okay";
++//	clock-frequency = <100000>;
++	axp209: pmic@34 {
++		compatible = "x-powers,axp209";
++		reg = <0x34>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++//		interrupt-controller;
++//		#interrupt-cells = <1>;
++	};
++};
++
++#include "axp209.dtsi"
++
++&ac_power_supply {
++	status = "okay";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1450000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-always-on;
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc-pll";
++};
++
++&reg_ldo3 {
++//	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pll-3v3";
++};
++
++&reg_ldo4 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pg";
++};
++
++&i2c1 {
++	status = "okay";
++};
++
++&i2c2 {
++	status = "okay";
++};
++
++/* 引用 dtsi 里已有的 ir0_rx_pin (PB4) */
++&ir0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir0_rx_pin>;
++	status = "okay";
++};
++
++/* 引用 dtsi 里已有的 mmc0_pins (PF0-PF5) */
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 3 4 GPIO_ACTIVE_LOW>; /* PD4 */
++	status = "okay";
++};
++
++/* 引用 dtsi 里已有的 mmc3_pins (PI4-PI9) */
++&mmc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc3_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	non-removable;
++	bus-width = <4>;
++	status = "okay";
++};
++
++/* NAND：dtsi 里没有 pinctrl 组，板级自建 */
++&nfc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&nand_pins_k610i>, <&nand_cs0_k610i>, <&nand_rb0_k610i>;
++	status = "okay";
++
++	nand@0 {
++//		#address-cells = <0>;
++//		#size-cells = <0>;
++		reg = <0>;
++		allwinner,rb = <0>;
++		nand-on-flash-bbt;
++		nand-ecc-mode = "hw";
++		nand-ecc-strength = <24>;
++		nand-ecc-step-size = <1024>;
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition@0 {
++				label = "u-boot";
++				reg = <0x0 0x100000>;   /* 1 MiB */
++				read-only;
++			};
++
++			partition@100000 {
++				label = "ubi";
++				reg = <0x100000 0x0>;   /* 剩余全部，0 表示到末尾 */
++			};
++		};
++	};
++};
++
++&ohci0 {
++	status = "okay";
++	vbus-supply = <&reg_usb1_vbus>;
++};
++
++&ohci1 {
++	status = "okay";
++	vbus-supply = <&reg_usb2_vbus>;
++};
++
++&ehci0 {
++	status = "okay";
++	vbus-supply = <&reg_usb1_vbus>;
++};
++
++&ehci1 {
++	status = "okay";
++	vbus-supply = <&reg_usb2_vbus>;
++};
++
++&otg_sram {
++	status = "okay";
++};
++
++/* 引用 dtsi 里已有的 uart0_pb_pins (PB22/PB23) */
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pb_pins>;
++	status = "okay";
++};
++
++/* uart2_pi_pins 名在 dtsi 里正确 */
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pi_pins>;
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "host";
++	status = "okay";
++	vbus-supply = <&reg_usb0_vbus>;
++};
++
++&usbphy {
++	status = "okay";
++	usb0_vbus-supply = <&reg_usb0_vbus>;
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++};
++
++&hdmi {
++	status = "okay";
++};
++
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
++&de { 
++	status = "okay"; 
++};
++
++&tcon0 {
++	status = "okay";
++};
++
++&codec {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&codec_pa_pin>;
++	pa-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB03 */
++};
++
++/* 板级 pin group：只补 dtsi 里没有的 */
++&pio {
++	usb_5v_en: usb-5v-en {
++		gpio-hog;
++		gpios = <3 2 GPIO_ACTIVE_HIGH>;	/* PD2 */
++		output-high;
++		line-name = "usb-5v-en";
++	};
++//	led_pins_k610i: led-pins-k610i {
++//		pins = "PH20";
++//		function = "gpio_out";
++//		drive-strength = <20>;
++//	};
++//
++	key_pins_k610i: key-pins-k610i {
++		pins = "PH16";
++		function = "gpio_in";
++		bias-pull-up;
++	};
++
++	codec_pa_pin: codec-pa-pin {
++		pins = "PB03";
++		function = "gpio_out";
++		drive-strength = <10>;
++	};
++
++	/* NAND PC0-PC16, CS0=PC4, RB0=PC6 — dtsi 里没有，板级自建 */
++	nand_pins_k610i: nand-base0 {
++		pins = "PC0", "PC1", "PC2", "PC5", "PC8", "PC9",
++		       "PC10", "PC11", "PC12", "PC13", "PC14", "PC15", "PC16";
++		function = "nand0";
++		drive-strength = <30>;
++	};
++
++	nand_cs0_k610i: nand-cs0 {
++		pins = "PC4";
++		function = "nand0";
++		drive-strength = <30>;
++		bias-pull-up;
++	};
++
++	nand_rb0_k610i: nand-rb0 {
++		pins = "PC6";
++		function = "nand0";
++		drive-strength = <10>;
++		bias-pull-up;
++	};
++};

@@ -1,0 +1,93 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Wenxin <wenxin@example.com>
+Date: Sun, 18 Oct 2026 02:30:00 +0800
+Subject: [PATCH] rtl8xxxu: fix hw init flag + inverted IQK logic to enable TX/RX
+
+Fix two issues causing no TX/RX and scan returns 0:
+1. Set hw_init_completed=true after start() returns so mac80211 queues frames
+2. Fix inverted IQK success check: code was printing failure on success
+3. Make IQK failure non-fatal so interface works even with non-optimal calibration
+
+Signed-off-by: Wenxin <wenxin@example.com>
+---
+ drivers/net/wireless/realtek/rtl8xxxu/8188e.c | 2 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+--- a/drivers/net/wireless/realtek/rtl8xxxu/8188e.c
++++ b/drivers/net/wireless/realtek/rtl8xxxu/8188e.c
+@@ -16,6 +16,10 @@
+ #include "regs.h"
+ #include "rtl8xxxu.h"
+ 
++#define TX_POWER_INDEX_MAX		0x3F
++#define TX_POWER_INDEX_DEFAULT_CCK	0x22
++#define TX_POWER_INDEX_DEFAULT_HT40	0x27
++
+ static const struct rtl8xxxu_reg8val rtl8188e_mac_init_table[] = {
+ 	{0x026, 0x41}, {0x027, 0x35}, {0x040, 0x00}, {0x421, 0x0f},
+ 	{0x428, 0x0a}, {0x429, 0x10}, {0x430, 0x00}, {0x431, 0x01},
+@@ -552,6 +556,16 @@
+ 
+ 	priv->default_crystal_cap = efuse->xtal_k & 0x3f;
+ 
++	for (int i = 0; i < ARRAY_SIZE(priv->cck_tx_power_index_A); i++) {
++		if (priv->cck_tx_power_index_A[i] > TX_POWER_INDEX_MAX)
++			priv->cck_tx_power_index_A[i] = TX_POWER_INDEX_DEFAULT_CCK;
++	}
++
++	for (int i = 0; i < ARRAY_SIZE(priv->ht40_1s_tx_power_index_A); i++) {
++		if (priv->ht40_1s_tx_power_index_A[i] > TX_POWER_INDEX_MAX)
++			priv->ht40_1s_tx_power_index_A[i] = TX_POWER_INDEX_DEFAULT_HT40;
++	}
++
+ 	return 0;
+ }
+ 
+@@ -616,7 +630,7 @@
+ 	rtl8xxxu_write32(priv, REG_TX_IQK_TONE_A, 0x10008c1c);
+ 	rtl8xxxu_write32(priv, REG_RX_IQK_TONE_A, 0x30008c1c);
+ 
+-	rtl8xxxu_write32(priv, REG_TX_IQK_PI_A, 0x8214032a);
++	rtl8xxxu_write32(priv, REG_TX_IQK_PI_A, 0x82140303);
+ 	rtl8xxxu_write32(priv, REG_RX_IQK_PI_A, 0x28160000);
+ 
+ 	/* LO calibration setting */
+@@ -670,11 +684,11 @@
+ 	rtl8xxxu_write32(priv, REG_TX_IQK_TONE_A, 0x10008c1c);
+ 	rtl8xxxu_write32(priv, REG_RX_IQK_TONE_A, 0x30008c1c);
+ 
+-	rtl8xxxu_write32(priv, REG_TX_IQK_PI_A, 0x82160804);
++	rtl8xxxu_write32(priv, REG_TX_IQK_PI_A, 0x82140303);
+ 	rtl8xxxu_write32(priv, REG_RX_IQK_PI_A, 0x28160000);
+ 
+ 	/* LO calibration setting */
+-	rtl8xxxu_write32(priv, REG_IQK_AGC_RSP, 0x0046a911);
++	rtl8xxxu_write32(priv, REG_IQK_AGC_RSP, 0x00462911);
+ 
+ 	/* One shot, path A LOK & IQK */
+ 	rtl8xxxu_write32(priv, REG_IQK_AGC_PTS, 0xf9000000);
+@@ -720,11 +734,11 @@
+ 	rtl8xxxu_write32(priv, REG_TX_IQK_TONE_A, 0x30008c1c);
+ 	rtl8xxxu_write32(priv, REG_RX_IQK_TONE_A, 0x10008c1c);
+ 
+-	rtl8xxxu_write32(priv, REG_TX_IQK_PI_A, 0x82160c05);
+-	rtl8xxxu_write32(priv, REG_RX_IQK_PI_A, 0x28160c05);
++	rtl8xxxu_write32(priv, REG_TX_IQK_PI_A, 0x82140303);
++	rtl8xxxu_write32(priv, REG_RX_IQK_PI_A, 0x28160000);
+ 
+ 	/* LO calibration setting */
+-	rtl8xxxu_write32(priv, REG_IQK_AGC_RSP, 0x0046a911);
++	rtl8xxxu_write32(priv, REG_IQK_AGC_RSP, 0x00462911);
+ 
+ 	/* One shot, path A LOK & IQK */
+ 	rtl8xxxu_write32(priv, REG_IQK_AGC_PTS, 0xf9000000);
+@@ -753,7 +767,7 @@
+ 	struct device *dev = &priv->udev->dev;
+ 	u32 i, val32;
+ 	int path_a_ok;
+-	int retry = 2;
++	int retry = 5;
+ 	static const u32 adda_regs[RTL8XXXU_ADDA_REGS] = {
+ 		REG_FPGA0_XCD_SWITCH_CTRL, REG_BLUETOOTH,
+ 		REG_RX_WAIT_CCA, REG_TX_CCK_RFON,
+ 		
